@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN, EntityCategory
@@ -130,16 +130,16 @@ async def async_setup_entry(
                 entity.key
             )
         # Example
-    #   {
-    #       "light.kitchen": {
-    #           "brightness": "<unique id of light.kitchen>_brightness",
-    #           "rgb_color": "<unique id of light.kitchen>_rgb_color"
-    #       },
-    #       "cover.kitchen_blind": {
-    #           "position": "<unique id of cover.kitchen_blind>_position"
-    #       },
-    #       ...
-    #   }
+        #   {
+        #       "light.kitchen": {
+        #           "brightness": "<unique id of light.kitchen>_brightness",
+        #           "rgb_color": "<unique id of light.kitchen>_rgb_color"
+        #       },
+        #       "cover.kitchen_blind": {
+        #           "position": "<unique id of cover.kitchen_blind>_position"
+        #       },
+        #       ...
+        #   }
     else:
         _LOGGER.error("Invalid entity type for %s", entry.entry_id)
         return False
@@ -223,7 +223,6 @@ class SceneAttributesStrategySelect(SelectEntity, RestoreEntity):
         self._name = f"{scene.name} Attributes Overlap Strategy"
         self._attr_unique_id = f"{scene.id}_scene_attribute_strategy"
 
-        # self._attr_options = SceneAttributeStrategy
         _LOGGER.debug(
             "Setting initial attributes overlap strategy for %s to %s",
             scene.name,
@@ -275,7 +274,7 @@ class SceneAttributesStrategySelect(SelectEntity, RestoreEntity):
                     self._scene.name,
                     last_state.state,
                 )
-                # Get the emun value for the last state if it is valid, else get the default value
+                # Get the enum value for the last state if it is valid, else get the default value
                 strategy = SceneAttributeStrategy.PRIORITY_ATTRIBUTE
                 if last_state:
                     if last_state_value := {

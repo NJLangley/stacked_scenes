@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import logging
 
+# Import the device class from the component that you want to support
+import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-
 from homeassistant.components.switch import (
     PLATFORM_SCHEMA as SWITCH_PLATFORM_SCHEMA,
+)
+from homeassistant.components.switch import (
     SwitchEntity,
 )
 from homeassistant.const import STATE_ON, EntityCategory
 from homeassistant.core import HomeAssistant
-
-# Import the device class from the component that you want to support
-import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event

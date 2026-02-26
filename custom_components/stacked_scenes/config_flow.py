@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.helpers import selector
 
@@ -48,16 +47,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=PLATFORM):
     def __init__(self) -> None:
         """Initialize the ConfigFlow class."""
         self.configuration = {}
-
-    # async def async_step_user(self, user_input: dict | None = None) -> dict:
-    #     """Handle a flow initialized by the user."""
-
-    #     return self.async_show_menu(
-    #         step_id="user",
-    #         menu_options=[
-    #             "configure_internal_scenes",
-    #         ],
-    #     )
 
     async def async_step_user(
         self,

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import logging
 
+import homeassistant.helpers.entity_registry as er
 from homeassistant.config_entries import SOURCE_INTEGRATION_DISCOVERY
 from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import discovery_flow
-import homeassistant.helpers.entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_SCENE_ENTITY_ID, PLATFORM

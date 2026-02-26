@@ -1,18 +1,18 @@
 """Stacked Scenes for Home Assistant."""
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import datetime
-import logging
 from pathlib import Path
 from typing import Self
 
 import yaml
-
 from homeassistant.components.light import COLOR_MODES_COLOR
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import area_registry as ar, issue_registry as ir
+from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.template.helpers import resolve_area_id
 
 from .const import (
@@ -236,7 +236,7 @@ class Hub:
                         # Validate light domains attributes are valid for the entity
                         if domain == "light":
                             #  We need the entity to check if attributes are ok, so if the target entity is not ready yet, we want to wait until it is
-                            # TODO: move this earlier in the process - check all scenes/entities before we start processing stuff to bial out earlier
+                            # TODO: move this earlier in the process - check all scenes/entities before we start processing stuff to bail out earlier/faster
                             entity_current_state = hass.states.get(entity_id)
                             if not entity_current_state:
                                 raise ConfigEntryNotReady(
@@ -672,80 +672,6 @@ class Scene:
             entity_overlapping_scenes_attributes,
         )
 
-    #     if new_state is None:
-    #         _LOGGER.warning(f"Entity not found: {entity_id}")
-    #         return False
-
-    #     if self.ignore_unavailable and new_state.state == "unavailable":
-    #         return None
-
-    #     # Check state
-    #     if not self.compare_values(self.entities[entity_id]["state"], new_state.state):
-    #         _LOGGER.debug(
-    #             "[%s] state not matching: %s: wanted=%s got=%s",
-    #             self.name,
-    #             entity_id,
-    #             self.entities[entity_id]["state"],
-    #             new_state.state,
-    #         )
-    #         return False
-
-    #     overlapping_scene = (
-    #         self.get_most_recently_activated_overlapping_scene_that_is_on()
-    #     )
-    #     if (
-    #         overlapping_scene is not None
-    #         and overlapping_scene.last_activation_dt > self.last_activation_dt
-    #     ):
-    #         _LOGGER.debug(
-    #             "[%s] Overlapping scene %s was activated more recently",
-    #             self.name,
-    #             overlapping_scene.name,
-    #         )
-    #         # Change the expected state to that of the overlapping scene
-    #         if entity_id in overlapping_scene.entities:
-    #             return True
-
-    #     # Check attributes
-    #     if new_state.domain in ATTRIBUTES_TO_CHECK:
-    #         entity_attrs = new_state.attributes
-    #         for attribute in ATTRIBUTES_TO_CHECK.get(new_state.domain):
-    #             if (
-    #                 attribute not in self.entities[entity_id]
-    #                 or attribute not in entity_attrs
-    #             ):
-    #                 continue
-    #             if not self.compare_values(
-    #                 self.entities[entity_id][attribute], entity_attrs[attribute]
-    #             ):
-    #                 _LOGGER.debug(
-    #                     "[%s] attribute not matching: %s %s: wanted=%s got=%s",
-    #                     self.name,
-    #                     entity_id,
-    #                     attribute,
-    #                     self.entities[entity_id][attribute],
-    #                     entity_attrs[attribute],
-    #                 )
-    #                 return False
-    #     _LOGGER.debug(
-    #         "[%s] Found match after %s updated",
-    #         self.name,
-    #         entity_id,
-    #     )
-    #     return True
-
-    # def get_most_recently_activated_overlapping_scene_that_is_on(self) -> "Scene":
-    #     """Get the most recently activated scene from a list of scenes."""
-    #     last_activation_dts = [
-    #         s.last_activation_dt for s in self.overlapping_scenes if s.is_on
-    #     ]
-    #     if last_activation_dts:
-    #         last_activation_dt = max(last_activation_dts)
-    #         for scene in self.overlapping_scenes:
-    #             if scene.last_activation_dt == last_activation_dt:
-    #                 return scene
-    #     return None
-
     def check_all_states(self):
         """Check the state of the scene.
 
@@ -775,12 +701,6 @@ class Scene:
 
     def restore(self):
         """Restore the state entities."""
-        # overlapping_entities = {
-        #     s._entity_id: e
-        #     for s in self.overlapping_scenes
-        #     for e in s.entities
-        #     if s.is_on and e in self.entities
-        # }
 
         entities = {}
         for entity_id, state in self.restore_states.items():
@@ -806,10 +726,10 @@ class Scene:
         if isinstance(value1, dict) and isinstance(value2, dict):
             return self.compare_dicts(value1, value2)
 
-        if (isinstance(value1, (list, tuple))) and (isinstance(value2, (list, tuple))):
+        if (isinstance(value1, list | tuple)) and (isinstance(value2, list | tuple)):
             return self.compare_lists(value1, value2)
 
-        if (isinstance(value1, (int, float))) and (isinstance(value2, (int, float))):
+        if (isinstance(value1, int | float)) and (isinstance(value2, int | float)):
             return self.compare_numbers(value1, value2)
 
         return value1 == value2
