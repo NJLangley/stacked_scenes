@@ -1,0 +1,12 @@
+{
+  "domain": "stacked_scenes",
+  "name": "Stacked Scenes",
+  "codeowners": [
+    "@njlangley"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/njlangley/stacked_scenes",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/njlangley/stacked_scenes/issues",
+  "version": "1.4.0"
+}

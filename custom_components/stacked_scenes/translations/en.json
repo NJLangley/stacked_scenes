@@ -1,0 +1,59 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Select whether you'd like to configure internal or external scenes.",
+        "menu_options": {
+          "configure_internal_scenes": "Home Assistant Scenes (do this first)",
+          "select_external_scenes": "EXPERIMENTAL: External Scenes"
+        },
+        "title": "Configure Stacked Scenes."
+      },
+      "configure_internal_scenes": {
+        "description": "Set the path to the scene file (default works with Home Assistant OS)",
+        "data": {
+          "scene_path": "Scene path",
+          "number_tolerance": "Rounding tolerance",
+          "restore_states_on_deactivate": "Restore states on deactivation",
+          "transition_time": "Transition time",
+          "debounce_time": "Debounce time",
+          "ignore_unavailable": "Ignore entities in unavailable state",
+          "enable_discovery": "Enable discovery"
+        }
+      },
+      "select_external_scenes": {
+        "description": "EXPERIMENTAL!\nSelect the scenes not in the config file that you'd like to configure. These scenes will need to be learned by Stacked Scenes.",
+        "data": {
+          "external_scenes": "External scenes"
+        }
+      },
+      "configure_external_scene_entities": {
+        "description": "Select entities that belong to {scene_name}.\nNote: upon submitting the scene will be turned on!",
+        "data": {
+          "scene_name": "Scene name",
+          "scene_id": "Scene ID",
+          "scene_entities": "Scene entities"
+        }
+      },
+      "learn_external_scene": {
+        "description": "Confirm whether the scene has been activated.",
+        "data": {
+          "external_scene_active": "Activated?"
+        }
+      }
+    },
+    "error": {
+      "invalid_yaml": "Invalid scenes file",
+      "yaml_not_found": "Specified YAML not found",
+      "unknown": "Unknown error occurred",
+      "no_entity_id": "No entity ID found",
+      "hub_not_found": "Main entry not found, configure Stacked Scenes first"
+    }
+  },
+  "issues": {
+    "scene_invalid_attribute_for_entity": {
+      "description": "The scene {scene_id} has an invalid attribute {attribute_name} for the entity {entity_id}.\n\nThe attribute is not supported by the entity, and will be ignored by Stacked Scenes when calculating the state to be applied.\n\nPlease manually remove the attribute from the entity in the scene definition YAML.",
+      "title": "Scene {scene_id} has an invalid attribute for the entity {entity_id}"
+    }
+  }
+}
