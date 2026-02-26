@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-
-# import asyncio
 from dataclasses import dataclass, field
 
 from homeassistant.config_entries import ConfigEntry

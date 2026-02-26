@@ -8,8 +8,6 @@
 
 Stacked Scenes was built because although Stacked Scenes is awesome (this integration wouldn't exist without me trying that first), it just didn't work for my setup in a large multi-use open-plan family room. If you need to be able to use an entity in multiple scenes, have it work out what the state should be as those overlap and and turned on and off, this integration **might** help. If you don't need any of that, just use Stacked Scenes - really, its awesome!
 
-This integration does not support external scenes like from Hue, Zigbee2MQTT etc. - Sorry. I don't use those, so don't have time or resources to add support.
-
 > ***Note:*** *Stacked Scenes and Stacked Scenes won't play nice together, so just use one of the other. If you don have both added, Stacked Scenes will generate a Home Assistant Repair asking you to remove one of them, and then won't load any further to avoid any weird behaviour.
 
 
@@ -65,15 +63,6 @@ Note that while all entity states are supported only some entity attributes are 
 
 ## Scene configurations
 For each scene you can specify the individual transition time and whether to restore on deactivation by changing the variables on the scene's device page.
-
-## External Scenes
-> Note this is an EXPERIMENTAL feature and may not work correctly for your setup. I have tested it with scenes configured in Zigbee2MQTT which works, but I do not have access to a Hue hub which therefore may not work correctly. If you are experiencing issues, please let me know or open a pull request with the improvements. 
-
-For scenes defined within Home Assistant the configurations are available in `scenes.yaml` however for scenes defined outside of Home Assistant such as within Zigbee2MQTT or another Zigbee hub these configuration files are not available. Therefore, Stacked Scenes can now learn the configuration of these external scenes by activating them and storing the parameters for each entity.
-
-To set this up, configure Stacked Scenes as normal. Then, any external scenes should be discovered or can be added manually by adding an entry on the integration page. The UI will then ask you what entities are controlled by the scene followed by activating the scene and saving the entity states. 
-
-As mentioned before this is an experimental feature. There are many different configurations out there and some hardware may behave differently than others. This may cause issues in setting up this feature. 
 
 ## HomeKit configuration
 Once you have configured this integration, you can add the scenes to HomeKit. I assume that you already set up and configured the HomeKit integration. Expose the newly added switches to HomeKit. Then, in HomeKit define scenes for each Stacked Scenes switch.

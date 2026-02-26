@@ -2,14 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "description": "Select whether you'd like to configure internal or external scenes.",
-        "menu_options": {
-          "configure_internal_scenes": "Home Assistant Scenes (do this first)",
-          "select_external_scenes": "EXPERIMENTAL: External Scenes"
-        },
-        "title": "Configure Stacked Scenes."
-      },
-      "configure_internal_scenes": {
+        "title": "Configure Stacked Scenes.",
         "description": "Set the path to the scene file (default works with Home Assistant OS)",
         "data": {
           "scene_path": "Scene path",
@@ -20,34 +13,13 @@
           "ignore_unavailable": "Ignore entities in unavailable state",
           "enable_discovery": "Enable discovery"
         }
-      },
-      "select_external_scenes": {
-        "description": "EXPERIMENTAL!\nSelect the scenes not in the config file that you'd like to configure. These scenes will need to be learned by Stacked Scenes.",
-        "data": {
-          "external_scenes": "External scenes"
-        }
-      },
-      "configure_external_scene_entities": {
-        "description": "Select entities that belong to {scene_name}.\nNote: upon submitting the scene will be turned on!",
-        "data": {
-          "scene_name": "Scene name",
-          "scene_id": "Scene ID",
-          "scene_entities": "Scene entities"
-        }
-      },
-      "learn_external_scene": {
-        "description": "Confirm whether the scene has been activated.",
-        "data": {
-          "external_scene_active": "Activated?"
-        }
       }
     },
     "error": {
       "invalid_yaml": "Invalid scenes file",
       "yaml_not_found": "Specified YAML not found",
       "unknown": "Unknown error occurred",
-      "no_entity_id": "No entity ID found",
-      "hub_not_found": "Main entry not found, configure Stacked Scenes first"
+      "no_entity_id": "No entity ID found"
     }
   },
   "issues": {

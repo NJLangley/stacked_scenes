@@ -1,18 +1,18 @@
 """Stacked Scenes for Home Assistant."""
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import datetime
-import logging
 from pathlib import Path
 from typing import Self
 
 import yaml
-
 from homeassistant.components.light.const import COLOR_MODES_COLOR
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import area_registry as ar, issue_registry as ir
+from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.template.helpers import resolve_area_id
 
 from .const import (
@@ -35,8 +35,6 @@ from .const import (
 from .helpers import (
     get_entity_id_from_unique_id,
     get_icon_from_entity_id,
-    get_id_from_entity_id,
-    get_name_from_entity_id,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -289,18 +287,6 @@ class Hub:
             "learn": scene_conf.get("learn", False),
             "entities": entities,
             "number_tolerance": scene_conf.get("number_tolerance", number_tolerance),
-        }
-
-    def prepare_external_scene(self, entity_id, entities) -> dict:
-        """Prepare external scene configuration."""
-        return {
-            "name": get_name_from_entity_id(self.hass, entity_id),
-            "id": get_id_from_entity_id(self.hass, entity_id),
-            "icon": get_icon_from_entity_id(self.hass, entity_id),
-            "entity_id": entity_id,
-            "area": area_name(self.hass, entity_id),
-            "learn": True,
-            "entities": entities,
         }
 
 

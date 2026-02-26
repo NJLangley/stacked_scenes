@@ -12,8 +12,8 @@ from homeassistant.helpers import discovery_flow
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
-    PLATFORM,
     CONF_SCENE_ENTITY_ID,
+    PLATFORM,
 )
 
 _LOGGER = logging.getLogger(__name__)
