@@ -1,18 +1,18 @@
 """Stacked Scenes for Home Assistant."""
 
 import asyncio
-import logging
 from dataclasses import dataclass
 from datetime import datetime
+import logging
 from pathlib import Path
 from typing import Self
 
 import yaml
-from homeassistant.components.light.const import COLOR_MODES_COLOR
+
+from homeassistant.components.light import COLOR_MODES_COLOR
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import area_registry as ar
-from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import area_registry as ar, issue_registry as ir
 from homeassistant.helpers.template.helpers import resolve_area_id
 
 from .const import (
@@ -32,10 +32,7 @@ from .const import (
     SceneAttributeStrategies,
     SceneAttributeStrategy,
 )
-from .helpers import (
-    get_entity_id_from_unique_id,
-    get_icon_from_entity_id,
-)
+from .helpers import get_entity_id_from_unique_id, get_icon_from_entity_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,6 +42,8 @@ def area_name(hass: HomeAssistant, entity_id: str) -> str:
     area_reg = ar.async_get(hass)
     if area := area_reg.async_get_area(resolve_area_id(hass, entity_id)):
         return area.name
+
+    return None
 
 
 class StackedScenesYamlNotFound(Exception):
@@ -399,12 +398,11 @@ class Scene:
         }
 
         # Dict merge doesn't play nice with nested dicts, so we enumerate the unique keys, and merge the dicts for those keys
-        final_dict = {
+        return {
             e: entities_to_turn_off.get(e, {})
             | overlapping_entity_attributes.get(e, {})
             for e in self.entities
         }
-        return final_dict
 
     def get_dynamic_scene_state_for_entity_attribute(
         self, entity_id, attribute, turn_on: bool = True
@@ -608,9 +606,6 @@ class Scene:
         """Check the state of the scene."""
         current_state = self.hass.states.get(entity_id)
 
-        if entity_id in ["light.lounge_lights"]:
-            self.print_debug_info(entity_id)
-
         if current_state.state != self.entities[entity_id]["state"]:
             return EntityStateCheckResult.NO_MATCH
 
@@ -637,14 +632,15 @@ class Scene:
         return EntityStateCheckResult.STATE_MATCH
 
     def print_debug_info(self, entity_id):
+        """Print debug info to the home assistant log file."""
         current_state = self.hass.states.get(entity_id)
-        _LOGGER.debug(f"Checking state for scene/entity: = {self.name}/{entity_id}")
+        _LOGGER.debug("Checking state for scene/entity = %s/%s", self.name, entity_id)
 
         overlapping_scene_entities = {
-            s.name: [e for e in s.entities] for s in self.overlapping_scenes
+            s.name: list(s.entities) for s in self.overlapping_scenes
         }
         _LOGGER.debug(
-            f"    Overlapping Scenes/entities: = {overlapping_scene_entities}"
+            "    Overlapping scenes/entities = %s", overlapping_scene_entities
         )
 
         entity_current_attributes = {
@@ -653,7 +649,9 @@ class Scene:
             if (a != "state" and a in current_state.attributes)
         }
         _LOGGER.debug(
-            f"    Current attributes for entity {entity_id}: = {entity_current_attributes}"
+            "    Current attributes for entity %s = %s",
+            entity_id,
+            entity_current_attributes,
         )
 
         entity_overlapping_scenes_attributes = {
@@ -669,7 +667,9 @@ class Scene:
         }
 
         _LOGGER.debug(
-            f"    Overlapping scene attributes for entity {entity_id}: = {entity_overlapping_scenes_attributes}"
+            "    Overlapping scene attributes for entity %s: = %s",
+            entity_id,
+            entity_overlapping_scenes_attributes,
         )
 
     #     if new_state is None:
@@ -775,12 +775,12 @@ class Scene:
 
     def restore(self):
         """Restore the state entities."""
-        overlapping_entities = {
-            s._entity_id: e
-            for s in self.overlapping_scenes
-            for e in s.entities
-            if s.is_on and e in self.entities
-        }
+        # overlapping_entities = {
+        #     s._entity_id: e
+        #     for s in self.overlapping_scenes
+        #     for e in s.entities
+        #     if s.is_on and e in self.entities
+        # }
 
         entities = {}
         for entity_id, state in self.restore_states.items():
@@ -806,14 +806,10 @@ class Scene:
         if isinstance(value1, dict) and isinstance(value2, dict):
             return self.compare_dicts(value1, value2)
 
-        if (isinstance(value1, list) or isinstance(value1, tuple)) and (
-            isinstance(value2, list) or isinstance(value2, tuple)
-        ):
+        if (isinstance(value1, (list, tuple))) and (isinstance(value2, (list, tuple))):
             return self.compare_lists(value1, value2)
 
-        if (isinstance(value1, int) or isinstance(value1, float)) and (
-            isinstance(value2, int) or isinstance(value2, float)
-        ):
+        if (isinstance(value1, (int, float))) and (isinstance(value2, (int, float))):
             return self.compare_numbers(value1, value2)
 
         return value1 == value2
@@ -829,7 +825,7 @@ class Scene:
 
     def compare_lists(self, list1, list2):
         """Compare two lists."""
-        for value1, value2 in zip(list1, list2):
+        for value1, value2 in zip(list1, list2, strict=False):
             if not self.compare_values(value1, value2):
                 return False
         return True

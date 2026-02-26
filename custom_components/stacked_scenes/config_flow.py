@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 import voluptuous as vol
+
 from homeassistant import config_entries
 from homeassistant.helpers import selector
 
@@ -34,11 +35,7 @@ from .const import (
     TRANSITION_MIN,
     TRANSITION_STEP,
 )
-from .StackedScenes import (
-    Hub,
-    StackedScenesYamlInvalid,
-    StackedScenesYamlNotFound,
-)
+from .StackedScenes import Hub, StackedScenesYamlInvalid, StackedScenesYamlNotFound
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,7 +80,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=PLATFORM):
             except StackedScenesYamlNotFound as err:
                 _LOGGER.warning(err)
                 errors["base"] = "yaml_not_found"
-            except Exception as err:
+            except Exception as err:  # noqa: BLE001
                 _LOGGER.warning(err)
                 errors["base"] = "unknown"
             else:

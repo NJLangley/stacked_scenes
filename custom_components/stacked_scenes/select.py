@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
+import logging
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN, EntityCategory
@@ -280,7 +280,7 @@ class SceneAttributesStrategySelect(SelectEntity, RestoreEntity):
                 if last_state:
                     if last_state_value := {
                         e.value: e for e in SceneAttributeStrategy
-                    }.get(last_state.state, None):
+                    }.get(last_state.state):
                         strategy = last_state_value
                 self._scene.set_scene_attribute_strategy(
                     SceneAttributeStrategy(strategy)
