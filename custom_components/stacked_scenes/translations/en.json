@@ -1,0 +1,31 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure Stacked Scenes.",
+        "description": "Set the path to the scene file (default works with Home Assistant OS)",
+        "data": {
+          "scene_path": "Scene path",
+          "number_tolerance": "Rounding tolerance",
+          "restore_states_on_deactivate": "Restore states on deactivation",
+          "transition_time": "Transition time",
+          "debounce_time": "Debounce time",
+          "ignore_unavailable": "Ignore entities in unavailable state",
+          "enable_discovery": "Enable discovery"
+        }
+      }
+    },
+    "error": {
+      "invalid_yaml": "Invalid scenes file",
+      "yaml_not_found": "Specified YAML not found",
+      "unknown": "Unknown error occurred",
+      "no_entity_id": "No entity ID found"
+    }
+  },
+  "issues": {
+    "scene_invalid_attribute_for_entity": {
+      "description": "The scene {scene_id} has an invalid attribute {attribute_name} for the entity {entity_id}.\n\nThe attribute is not supported by the entity, and will be ignored by Stacked Scenes when calculating the state to be applied.\n\nPlease manually remove the attribute from the entity in the scene definition YAML.",
+      "title": "Scene {scene_id} has an invalid attribute for the entity {entity_id}"
+    }
+  }
+}
