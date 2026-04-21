@@ -23,5 +23,5 @@ jobs:
 
         - name: "Ruff Checks"
           run: |
-            uv tool run ruff format check .
+            uv tool run ruff format --check .
             uv tool run ruff check .
