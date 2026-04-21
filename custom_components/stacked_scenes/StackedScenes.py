@@ -2,10 +2,11 @@
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 import yaml
 from homeassistant.components.light import COLOR_MODES_COLOR
@@ -22,7 +23,6 @@ from .const import (
     CONF_SCENE_ENTITY_ID,
     CONF_SCENE_ICON,
     CONF_SCENE_ID,
-    CONF_SCENE_LEARN,
     CONF_SCENE_NAME,
     CONF_SCENE_NUMBER_TOLERANCE,
     PLATFORM,
@@ -37,10 +37,13 @@ from .helpers import get_entity_id_from_unique_id, get_icon_from_entity_id
 _LOGGER = logging.getLogger(__name__)
 
 
-def area_name(hass: HomeAssistant, entity_id: str) -> str:
+def area_name(hass: HomeAssistant, entity_id: str) -> str | None:
     """Get area name from entity_id."""
     area_reg = ar.async_get(hass)
-    if area := area_reg.async_get_area(resolve_area_id(hass, entity_id)):
+
+    if not (area_id := resolve_area_id(hass, entity_id)):
+        return None
+    if area := area_reg.async_get_area(area_id):
         return area.name
 
     return None
@@ -54,248 +57,25 @@ class StackedScenesYamlInvalid(Exception):
     """Raised when specified yaml is invalid."""
 
 
-def get_entity_id_from_id(hass: HomeAssistant, id: str) -> str:
+def get_entity_id_from_id(hass: HomeAssistant, id: str) -> str | None:
     """Get entity_id from scene id."""
     entity_ids = hass.states.async_entity_ids("scene")
     for entity_id in entity_ids:
-        state = hass.states.get(entity_id)
-        if state.attributes.get("id", None) == id:
+        if not (state := hass.states.get(entity_id)):
+            return None
+
+        if state.attributes.get("id", "") == id:
             return entity_id
     return None
-
-
-class Hub:
-    """State scene class."""
-
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        # scenes = list[Scene],
-        scenes=list,
-        number_tolerance: int = 1,
-    ) -> None:
-        """Initialize the Hub class.
-
-        Args:
-            hass (HomeAssistant): Home Assistant instance
-            scenes (list): List of scenes
-            number_tolerance (int): Tolerance for comparing numbers
-
-
-        Raises:
-            StackedScenesYamlNotFound: If the yaml file is not found
-            StackedScenesYamlInvalid: If the yaml file is invalid
-
-        """
-        self.number_tolerance = number_tolerance
-        self.hass = hass
-        self.scenes: list[Scene] = scenes
-        self.set_overlapping_scenes()
-
-    @classmethod
-    async def from_config(
-        cls,
-        hass: HomeAssistant,
-        scene_path: str,
-        entity_strategy_select_mapping: dict[str, dict[str, str]],
-        number_tolerance: int = 1,
-    ) -> Self:
-        """Create a Hub instance from configuration."""
-        scene_confs = await cls.load_scenes_confs(scene_path)
-
-        scenes: list[Scene] = []
-        for scene_conf in scene_confs:
-            if not cls.validate_scene(scene_conf):
-                continue
-            scenes.append(
-                Scene(
-                    hass,
-                    cls.extract_scene_configuration(hass, scene_conf, number_tolerance),
-                    entity_strategy_select_mapping,
-                )
-            )
-        return cls(hass, scenes, number_tolerance)
-
-    def set_overlapping_scenes(self):
-        """Scenes that have the same entities overlap.
-
-        We can use that to apply rules for determining
-        when a scene is on or off based on other scenes using either:
-        - Which scene was activated first/last
-        - Which scene has the highest/lowest brightness (for lights)
-        - Which scene has the highest priority (set in the scene configuration).
-        """
-
-        # Skip any scenes that just turn everything off - they're always gonna overlap
-        def is_valid(scene):
-            # Check each desired state for the scene, if any are "on", it's valid
-            return any(v.get("state") == "on" for v in scene.entities.values())
-
-        # Find scenes that have the same entities
-        for scene in self.scenes:
-            scene.overlapping_scenes = [
-                other_scene
-                for other_scene in self.scenes
-                if other_scene != scene
-                and other_scene.entities.keys() & scene.entities.keys()
-                and is_valid(scene)
-                and is_valid(other_scene)
-            ]
-
-    @classmethod
-    async def load_scenes_confs(cls, scene_path: str) -> list:
-        """Load scenes from yaml file."""
-        # check if file exists
-        if scene_path is None:
-            raise StackedScenesYamlNotFound("Scenes file not specified.")
-        path = Path(scene_path)
-        if not path.exists():
-            # In the dev container the config path is missing so try with as a prefix...
-            path = Path("config", path)
-            if not path.exists():
-                _LOGGER.debug("Path not found: %s", str(path.absolute()))
-                raise StackedScenesYamlNotFound("No scenes file " + scene_path)
-
-        try:
-
-            def sync_load_scene_confs() -> list:
-                with path.open(encoding="utf-8") as f:
-                    return yaml.load(f, Loader=yaml.FullLoader)
-
-            # Use an executor to load the file asynchronously
-            loop = asyncio.get_running_loop()
-            scene_confs = await loop.run_in_executor(None, sync_load_scene_confs)
-        except OSError as err:
-            raise StackedScenesYamlInvalid("No scenes found in " + scene_path) from err
-
-        if not scene_confs or not isinstance(scene_confs, list):
-            raise StackedScenesYamlInvalid("No scenes found in " + scene_path)
-
-        return scene_confs
-
-    @classmethod
-    def validate_scene(cls, scene_conf: dict) -> None:
-        """Validate scene configuration.
-
-        Args:
-            scene_conf (dict): Scene configuration
-
-        Raises:
-            StackedScenesYamlInvalid: If the scene is invalid
-
-        Returns:
-            bool: True if the scene is valid
-
-        """
-
-        if "entities" not in scene_conf:
-            raise StackedScenesYamlInvalid(
-                "Scene is missing entities: " + scene_conf["name"]
-            )
-
-        if "id" not in scene_conf:
-            raise StackedScenesYamlInvalid("Scene is missing id: " + scene_conf["name"])
-
-        for entity_id, scene_attributes in scene_conf["entities"].items():
-            if "state" not in scene_attributes:
-                raise StackedScenesYamlInvalid(
-                    "Scene is missing state for entity "
-                    + entity_id
-                    + scene_conf["name"]
-                )
-
-        return True
-
-    @classmethod
-    def extract_scene_configuration(
-        cls, hass: HomeAssistant, scene_conf: dict, number_tolerance
-    ) -> dict:
-        """Extract entities and attributes from a scene.
-
-        Args:
-            hass (HomeAssistant): Home Assistant instance
-            scene_conf (dict): Scene configuration
-            number_tolerance (int): Tolerance for comparing numbers
-
-        Returns:
-            dict: Scene configuration
-
-        """
-        scene_entity_id = scene_conf.get("entity_id")
-        if scene_entity_id is None:
-            scene_entity_id = get_entity_id_from_id(hass, scene_conf.get("id"))
-
-        entities = {}
-        for entity_id, scene_attributes in scene_conf["entities"].items():
-            domain = entity_id.split(".")[0]
-            attributes = {"state": scene_attributes["state"]}
-
-            if domain in ATTRIBUTES_TO_CHECK:
-                for attribute, value in scene_attributes.items():
-                    if attribute in ATTRIBUTES_TO_CHECK.get(domain):
-                        # Validate light domains attributes are valid for the entity
-                        if domain == "light":
-                            #  We need the entity to check if attributes are ok, so if the target entity is not ready yet, we want to wait until it is
-                            # TODO: move this earlier in the process - check all scenes/entities before we start processing stuff to bail out earlier/faster
-                            entity_current_state = hass.states.get(entity_id)
-                            if not entity_current_state:
-                                raise ConfigEntryNotReady(
-                                    "Not all entities used by the scenes have loaded yet."
-                                )
-
-                            # If the attribute is a color value, and the light does not support color, create a repair as a warning
-                            supported_color_modes = entity_current_state.attributes[
-                                "supported_color_modes"
-                            ]
-                            if attribute == "rgb_color" and not any(
-                                cm in COLOR_MODES_COLOR for cm in supported_color_modes
-                            ):
-                                ir.async_create_issue(
-                                    hass,
-                                    PLATFORM,
-                                    SCENE_INVALID_ATTRIBUTE_FOR_ENTITY_ISSUE_ID.format(
-                                        scene_id=scene_entity_id,
-                                        entity_id=entity_id,
-                                        attribute_name=attribute,
-                                    ),
-                                    breaks_in_ha_version=None,
-                                    is_fixable=False,
-                                    severity=ir.IssueSeverity.WARNING,
-                                    translation_key=SCENE_INVALID_ATTRIBUTE_FOR_ENTITY,
-                                    translation_placeholders={
-                                        "scene_id": scene_entity_id,
-                                        "entity_id": entity_id,
-                                        "attribute_name": attribute,
-                                    },
-                                )
-                                continue
-
-                        # We can use the attribute
-                        attributes[attribute] = value
-
-            entities[entity_id] = attributes
-
-        return {
-            "name": scene_conf["name"],
-            "id": scene_conf.get("id", scene_entity_id),
-            "icon": scene_conf.get(
-                "icon", get_icon_from_entity_id(hass, scene_entity_id)
-            ),
-            "entity_id": scene_entity_id,
-            "area": area_name(hass, scene_entity_id),
-            "learn": scene_conf.get("learn", False),
-            "entities": entities,
-            "number_tolerance": scene_conf.get("number_tolerance", number_tolerance),
-        }
 
 
 @dataclass
 class SceneEntityAttributeValueDetails:
     """Represents a value of an entities attribute, along with the priority of the scene the value comes from and the last time the scene was activated."""
 
-    value: any
+    value: Any
     priority: int
-    last_activation_dt: datetime
+    last_activation_dt: datetime | None
 
 
 class Scene:
@@ -309,14 +89,13 @@ class Scene:
     ) -> None:
         """Initialize."""
         self.hass = hass
-        self.name = scene_conf[CONF_SCENE_NAME]
-        self._entity_id = scene_conf[CONF_SCENE_ENTITY_ID]
-        self.number_tolerance = scene_conf[CONF_SCENE_NUMBER_TOLERANCE]
-        self._id = scene_conf[CONF_SCENE_ID]
-        self.area_id = scene_conf[CONF_SCENE_AREA]
-        self.learn = scene_conf[CONF_SCENE_LEARN]
-        self.entities = scene_conf[CONF_SCENE_ENTITIES]
-        self.icon = scene_conf[CONF_SCENE_ICON]
+        self.name: str = scene_conf[CONF_SCENE_NAME]
+        self._entity_id: str = scene_conf[CONF_SCENE_ENTITY_ID]
+        self.number_tolerance = int(scene_conf[CONF_SCENE_NUMBER_TOLERANCE])
+        self._id: str = scene_conf[CONF_SCENE_ID]
+        self.area_id: str | None = scene_conf[CONF_SCENE_AREA]
+        self.entities: dict[str, Any] = scene_conf[CONF_SCENE_ENTITIES]
+        self.icon: str | None = scene_conf[CONF_SCENE_ICON]
         self._entity_strategy_select_mapping = entity_strategy_select_mapping
         self._is_on = False
         self._transition_time = 0.0
@@ -329,36 +108,36 @@ class Scene:
         )
 
         self.callback = None
-        self.callback_funcs = {}
+        self.callback_funcs: dict[str, Callable] = {}
         self.schedule_update = None
         self.states = dict.fromkeys(self.entities, False)
         self.restore_states = dict.fromkeys(self.entities)
 
         self.overlapping_scenes: list[Self] = []
 
-        if self.learn:
-            self.learned = False
-
-        if self._entity_id is None:
-            self._entity_id = get_entity_id_from_id(self.hass, self._id)
+        if not self._entity_id:
+            if not (entity_id_from_id := get_entity_id_from_id(self.hass, self._id)):
+                raise ValueError("Could not derive entity id from the id.")
+            self._entity_id = entity_id_from_id
 
     @property
-    def is_on(self):
+    def is_on(self) -> bool:
         """Return true if the scene is on."""
         return self._is_on
 
     @property
-    def id(self):
+    def id(self) -> str:
         """Return the id of the scene."""
-        if self.learn:
-            return self._id + "_learned"  # avoids non-unique id during testing
         return self._id
 
     @property
-    def last_activation_dt(self) -> datetime:
+    def last_activation_dt(self) -> datetime | None:
         """Return the last activation date/time of the scene."""
         # For scenes the last activation time is stored in the state
-        return self.hass.states.get(self._entity_id).state
+        if entity_state := self.hass.states.get(self._entity_id):
+            return datetime.fromisoformat(entity_state.state)
+
+        return None
 
     # ===================================================================================================
     # ===================================================================================================
@@ -367,7 +146,7 @@ class Scene:
 
     def get_dynamic_scene_state(
         self, turn_on: bool = True
-    ) -> dict[str, dict[str, any]]:
+    ) -> dict[str, dict[str, Any]]:
         """Get the dynamic scene state required when turning the scene on or off."""
         relevant_scenes = [s for s in self.overlapping_scenes if s.is_on]
         if turn_on:
@@ -405,8 +184,8 @@ class Scene:
         }
 
     def get_dynamic_scene_state_for_entity_attribute(
-        self, entity_id, attribute, turn_on: bool = True
-    ) -> dict[str, any]:
+        self, entity_id: str, attribute: str, turn_on: bool = True
+    ) -> dict[str, Any]:
         """Get the dynamic state of an entity attribute in the scene, taking account of other active scenes and the priority defined for the entity/attribute."""
         # Get the strategy we want to use
         strategy_unique_id = self._entity_strategy_select_mapping.get(
@@ -415,7 +194,9 @@ class Scene:
         strategy_entity_id = get_entity_id_from_unique_id(
             self.hass, domain="select", platform=PLATFORM, unique_id=strategy_unique_id
         )
-        strategy_entity_state = self.hass.states.get(strategy_entity_id)
+        strategy_entity_state = (
+            self.hass.states.get(strategy_entity_id) if strategy_entity_id else None
+        )
         strategy = strategy_entity_state.state if strategy_entity_state else None
 
         relevant_scenes = [s for s in self.overlapping_scenes if s.is_on]
@@ -756,12 +537,226 @@ class Scene:
         """Compare two numbers."""
         return abs(number1 - number2) <= self.number_tolerance
 
-    @staticmethod
-    def learn_scene_states(hass: HomeAssistant, entities: list) -> dict:
-        """Learn the state of the scene."""
-        conf = {}
-        for entity in entities:
-            state = hass.states.get(entity)
-            conf[entity] = {"state": state.state}
-            conf[entity].update(state.attributes)
-        return conf
+
+class Hub:
+    """State scene class."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        # scenes = list[Scene],
+        scenes=list[Scene],
+        number_tolerance: int = 1,
+    ) -> None:
+        """Initialize the Hub class.
+
+        Args:
+            hass (HomeAssistant): Home Assistant instance
+            scenes (list): List of scenes
+            number_tolerance (int): Tolerance for comparing numbers
+
+
+        Raises:
+            StackedScenesYamlNotFound: If the yaml file is not found
+            StackedScenesYamlInvalid: If the yaml file is invalid
+
+        """
+        self.number_tolerance = number_tolerance
+        self.hass = hass
+        self.scenes: list[Scene] = scenes
+        self.set_overlapping_scenes()
+
+    @classmethod
+    async def from_config(
+        cls,
+        hass: HomeAssistant,
+        scene_path: str,
+        entity_strategy_select_mapping: dict[str, dict[str, str]],
+        number_tolerance: int = 1,
+    ) -> Self:
+        """Create a Hub instance from configuration."""
+        scene_confs = await cls.load_scenes_confs(scene_path)
+
+        scenes: list[Scene] = []
+        for scene_conf in scene_confs:
+            if not cls.validate_scene(scene_conf):
+                continue
+            scenes.append(
+                Scene(
+                    hass,
+                    cls.extract_scene_configuration(hass, scene_conf, number_tolerance),
+                    entity_strategy_select_mapping,
+                )
+            )
+        return cls(hass, scenes, number_tolerance)
+
+    def set_overlapping_scenes(self):
+        """Scenes that have the same entities overlap.
+
+        We can use that to apply rules for determining
+        when a scene is on or off based on other scenes using either:
+        - Which scene was activated first/last
+        - Which scene has the highest/lowest brightness (for lights)
+        - Which scene has the highest priority (set in the scene configuration).
+        """
+
+        # Skip any scenes that just turn everything off - they're always gonna overlap
+        def is_valid(scene):
+            # Check each desired state for the scene, if any are "on", it's valid
+            return any(v.get("state") == "on" for v in scene.entities.values())
+
+        # Find scenes that have the same entities
+        for scene in self.scenes:
+            scene.overlapping_scenes = [
+                other_scene
+                for other_scene in self.scenes
+                if other_scene != scene
+                and other_scene.entities.keys() & scene.entities.keys()
+                and is_valid(scene)
+                and is_valid(other_scene)
+            ]
+
+    @classmethod
+    async def load_scenes_confs(cls, scene_path: str) -> list:
+        """Load scenes from yaml file."""
+        # check if file exists
+        if scene_path is None:
+            raise StackedScenesYamlNotFound("Scenes file not specified.")
+        path = Path(scene_path)
+        if not path.exists():
+            # In the dev container the config path is missing so try with as a prefix...
+            path = Path("config", path)
+            if not path.exists():
+                _LOGGER.debug("Path not found: %s", str(path.absolute()))
+                raise StackedScenesYamlNotFound("No scenes file " + scene_path)
+
+        try:
+
+            def sync_load_scene_confs() -> list:
+                with path.open(encoding="utf-8") as f:
+                    return yaml.load(f, Loader=yaml.FullLoader)
+
+            # Use an executor to load the file asynchronously
+            loop = asyncio.get_running_loop()
+            scene_confs = await loop.run_in_executor(None, sync_load_scene_confs)
+        except OSError as err:
+            raise StackedScenesYamlInvalid("No scenes found in " + scene_path) from err
+
+        if not scene_confs or not isinstance(scene_confs, list):
+            raise StackedScenesYamlInvalid("No scenes found in " + scene_path)
+
+        return scene_confs
+
+    @classmethod
+    def validate_scene(cls, scene_conf: dict) -> None:
+        """Validate scene configuration.
+
+        Args:
+            scene_conf (dict): Scene configuration
+
+        Raises:
+            StackedScenesYamlInvalid: If the scene is invalid
+
+        Returns:
+            bool: True if the scene is valid
+
+        """
+
+        if "entities" not in scene_conf:
+            raise StackedScenesYamlInvalid(
+                "Scene is missing entities: " + scene_conf["name"]
+            )
+
+        if "id" not in scene_conf:
+            raise StackedScenesYamlInvalid("Scene is missing id: " + scene_conf["name"])
+
+        for entity_id, scene_attributes in scene_conf["entities"].items():
+            if "state" not in scene_attributes:
+                raise StackedScenesYamlInvalid(
+                    "Scene is missing state for entity "
+                    + entity_id
+                    + scene_conf["name"]
+                )
+
+        return True
+
+    @classmethod
+    def extract_scene_configuration(
+        cls, hass: HomeAssistant, scene_conf: dict, number_tolerance
+    ) -> dict:
+        """Extract entities and attributes from a scene.
+
+        Args:
+            hass (HomeAssistant): Home Assistant instance
+            scene_conf (dict): Scene configuration
+            number_tolerance (int): Tolerance for comparing numbers
+
+        Returns:
+            dict: Scene configuration
+
+        """
+        scene_entity_id = scene_conf.get("entity_id")
+        if scene_entity_id is None:
+            scene_entity_id = get_entity_id_from_id(hass, scene_conf.get("id"))
+
+        entities = {}
+        for entity_id, scene_attributes in scene_conf["entities"].items():
+            domain = entity_id.split(".")[0]
+            attributes = {"state": scene_attributes["state"]}
+
+            if domain in ATTRIBUTES_TO_CHECK:
+                for attribute, value in scene_attributes.items():
+                    if attribute in ATTRIBUTES_TO_CHECK.get(domain):
+                        # Validate light domains attributes are valid for the entity
+                        if domain == "light":
+                            #  We need the entity to check if attributes are ok, so if the target entity is not ready yet, we want to wait until it is
+                            # TODO: move this earlier in the process - check all scenes/entities before we start processing stuff to bail out earlier/faster
+                            entity_current_state = hass.states.get(entity_id)
+                            if not entity_current_state:
+                                raise ConfigEntryNotReady(
+                                    "Not all entities used by the scenes have loaded yet."
+                                )
+
+                            # If the attribute is a color value, and the light does not support color, create a repair as a warning
+                            supported_color_modes = entity_current_state.attributes[
+                                "supported_color_modes"
+                            ]
+                            if attribute == "rgb_color" and not any(
+                                cm in COLOR_MODES_COLOR for cm in supported_color_modes
+                            ):
+                                ir.async_create_issue(
+                                    hass,
+                                    PLATFORM,
+                                    SCENE_INVALID_ATTRIBUTE_FOR_ENTITY_ISSUE_ID.format(
+                                        scene_id=scene_entity_id,
+                                        entity_id=entity_id,
+                                        attribute_name=attribute,
+                                    ),
+                                    breaks_in_ha_version=None,
+                                    is_fixable=False,
+                                    severity=ir.IssueSeverity.WARNING,
+                                    translation_key=SCENE_INVALID_ATTRIBUTE_FOR_ENTITY,
+                                    translation_placeholders={
+                                        "scene_id": scene_entity_id,
+                                        "entity_id": entity_id,
+                                        "attribute_name": attribute,
+                                    },
+                                )
+                                continue
+
+                        # We can use the attribute
+                        attributes[attribute] = value
+
+            entities[entity_id] = attributes
+
+        return {
+            "name": scene_conf["name"],
+            "id": scene_conf.get("id", scene_entity_id),
+            "icon": scene_conf.get(
+                "icon", get_icon_from_entity_id(hass, scene_entity_id)
+            ),
+            "entity_id": scene_entity_id,
+            "area": area_name(hass, scene_entity_id),
+            "entities": entities,
+            "number_tolerance": scene_conf.get("number_tolerance", number_tolerance),
+        }
