@@ -22,7 +22,6 @@ from .const import (
     CONF_SCENE_ENTITY_ID,
     CONF_SCENE_ICON,
     CONF_SCENE_ID,
-    CONF_SCENE_LEARN,
     CONF_SCENE_NAME,
     CONF_SCENE_NUMBER_TOLERANCE,
     PLATFORM,
@@ -753,13 +752,3 @@ class Scene:
     def compare_numbers(self, number1, number2):
         """Compare two numbers."""
         return abs(number1 - number2) <= self.number_tolerance
-
-    @staticmethod
-    def learn_scene_states(hass: HomeAssistant, entities: list) -> dict:
-        """Learn the state of the scene."""
-        conf = {}
-        for entity in entities:
-            state = hass.states.get(entity)
-            conf[entity] = {"state": state.state}
-            conf[entity].update(state.attributes)
-        return conf

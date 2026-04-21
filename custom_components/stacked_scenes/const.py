@@ -27,7 +27,6 @@ DEBOUNCE_STEP = 0.1
 
 # Scene configuration
 CONF_SCENE_NAME = "name"
-CONF_SCENE_LEARN = "learn"
 CONF_SCENE_NUMBER_TOLERANCE = "number_tolerance"
 CONF_SCENE_ENTITY_ID = "entity_id"
 CONF_SCENE_ID = "id"
