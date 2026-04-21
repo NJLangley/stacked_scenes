@@ -606,6 +606,8 @@ class Scene:
         """Check the state of the scene."""
         current_state = self.hass.states.get(entity_id)
 
+        # TODO: Check how this behaves with a cover - we might not want to check the state as one scene could be 0% open and another 50% open, and then we might
+        #       get issues.
         if current_state.state != self.entities[entity_id]["state"]:
             return EntityStateCheckResult.NO_MATCH
 
