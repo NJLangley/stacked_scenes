@@ -81,3 +81,7 @@ Also what happens is all entities are on, but none re exactly as set in the scen
     - Check if at least one entity in the scene is exactly right (DONE)
         - Then if the rest are the right state, the scene is on (DONE)
             - Except covers? (ignore initially) - (NOT DONE)
+
+
+
+    - Devices with multiple entities in the same domain (e.g. WLED with multiple light entities) all the same device level priority mode
