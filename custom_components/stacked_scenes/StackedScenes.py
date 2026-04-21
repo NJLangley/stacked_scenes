@@ -2,10 +2,11 @@
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 import yaml
 from homeassistant.components.light import COLOR_MODES_COLOR
@@ -36,10 +37,13 @@ from .helpers import get_entity_id_from_unique_id, get_icon_from_entity_id
 _LOGGER = logging.getLogger(__name__)
 
 
-def area_name(hass: HomeAssistant, entity_id: str) -> str:
+def area_name(hass: HomeAssistant, entity_id: str) -> str | None:
     """Get area name from entity_id."""
     area_reg = ar.async_get(hass)
-    if area := area_reg.async_get_area(resolve_area_id(hass, entity_id)):
+
+    if not (area_id := resolve_area_id(hass, entity_id)):
+        return None
+    if area := area_reg.async_get_area(area_id):
         return area.name
 
     return None
@@ -53,12 +57,14 @@ class StackedScenesYamlInvalid(Exception):
     """Raised when specified yaml is invalid."""
 
 
-def get_entity_id_from_id(hass: HomeAssistant, id: str) -> str:
+def get_entity_id_from_id(hass: HomeAssistant, id: str) -> str | None:
     """Get entity_id from scene id."""
     entity_ids = hass.states.async_entity_ids("scene")
     for entity_id in entity_ids:
-        state = hass.states.get(entity_id)
-        if state.attributes.get("id", None) == id:
+        if not (state := hass.states.get(entity_id)):
+            return None
+
+        if state.attributes.get("id", "") == id:
             return entity_id
     return None
 
@@ -67,9 +73,9 @@ def get_entity_id_from_id(hass: HomeAssistant, id: str) -> str:
 class SceneEntityAttributeValueDetails:
     """Represents a value of an entities attribute, along with the priority of the scene the value comes from and the last time the scene was activated."""
 
-    value: any
+    value: Any
     priority: int
-    last_activation_dt: datetime
+    last_activation_dt: datetime | None
 
 
 class Scene:
@@ -83,14 +89,13 @@ class Scene:
     ) -> None:
         """Initialize."""
         self.hass = hass
-        self.name = scene_conf[CONF_SCENE_NAME]
-        self._entity_id = scene_conf[CONF_SCENE_ENTITY_ID]
-        self.number_tolerance = scene_conf[CONF_SCENE_NUMBER_TOLERANCE]
-        self._id = scene_conf[CONF_SCENE_ID]
-        self.area_id = scene_conf[CONF_SCENE_AREA]
-        self.learn = scene_conf[CONF_SCENE_LEARN]
-        self.entities = scene_conf[CONF_SCENE_ENTITIES]
-        self.icon = scene_conf[CONF_SCENE_ICON]
+        self.name: str = scene_conf[CONF_SCENE_NAME]
+        self._entity_id: str = scene_conf[CONF_SCENE_ENTITY_ID]
+        self.number_tolerance = int(scene_conf[CONF_SCENE_NUMBER_TOLERANCE])
+        self._id: str = scene_conf[CONF_SCENE_ID]
+        self.area_id: str | None = scene_conf[CONF_SCENE_AREA]
+        self.entities: dict[str, Any] = scene_conf[CONF_SCENE_ENTITIES]
+        self.icon: str | None = scene_conf[CONF_SCENE_ICON]
         self._entity_strategy_select_mapping = entity_strategy_select_mapping
         self._is_on = False
         self._transition_time = 0.0
@@ -103,36 +108,36 @@ class Scene:
         )
 
         self.callback = None
-        self.callback_funcs = {}
+        self.callback_funcs: dict[str, Callable] = {}
         self.schedule_update = None
         self.states = dict.fromkeys(self.entities, False)
         self.restore_states = dict.fromkeys(self.entities)
 
         self.overlapping_scenes: list[Self] = []
 
-        if self.learn:
-            self.learned = False
-
-        if self._entity_id is None:
-            self._entity_id = get_entity_id_from_id(self.hass, self._id)
+        if not self._entity_id:
+            if not (entity_id_from_id := get_entity_id_from_id(self.hass, self._id)):
+                raise ValueError("Could not derive entity id from the id.")
+            self._entity_id = entity_id_from_id
 
     @property
-    def is_on(self):
+    def is_on(self) -> bool:
         """Return true if the scene is on."""
         return self._is_on
 
     @property
-    def id(self):
+    def id(self) -> str:
         """Return the id of the scene."""
-        if self.learn:
-            return self._id + "_learned"  # avoids non-unique id during testing
         return self._id
 
     @property
-    def last_activation_dt(self) -> datetime:
+    def last_activation_dt(self) -> datetime | None:
         """Return the last activation date/time of the scene."""
         # For scenes the last activation time is stored in the state
-        return self.hass.states.get(self._entity_id).state
+        if entity_state := self.hass.states.get(self._entity_id):
+            return datetime.fromisoformat(entity_state.state)
+
+        return None
 
     # ===================================================================================================
     # ===================================================================================================
@@ -141,7 +146,7 @@ class Scene:
 
     def get_dynamic_scene_state(
         self, turn_on: bool = True
-    ) -> dict[str, dict[str, any]]:
+    ) -> dict[str, dict[str, Any]]:
         """Get the dynamic scene state required when turning the scene on or off."""
         relevant_scenes = [s for s in self.overlapping_scenes if s.is_on]
         if turn_on:
@@ -179,8 +184,8 @@ class Scene:
         }
 
     def get_dynamic_scene_state_for_entity_attribute(
-        self, entity_id, attribute, turn_on: bool = True
-    ) -> dict[str, any]:
+        self, entity_id: str, attribute: str, turn_on: bool = True
+    ) -> dict[str, Any]:
         """Get the dynamic state of an entity attribute in the scene, taking account of other active scenes and the priority defined for the entity/attribute."""
         # Get the strategy we want to use
         strategy_unique_id = self._entity_strategy_select_mapping.get(
@@ -189,7 +194,9 @@ class Scene:
         strategy_entity_id = get_entity_id_from_unique_id(
             self.hass, domain="select", platform=PLATFORM, unique_id=strategy_unique_id
         )
-        strategy_entity_state = self.hass.states.get(strategy_entity_id)
+        strategy_entity_state = (
+            self.hass.states.get(strategy_entity_id) if strategy_entity_id else None
+        )
         strategy = strategy_entity_state.state if strategy_entity_state else None
 
         relevant_scenes = [s for s in self.overlapping_scenes if s.is_on]
